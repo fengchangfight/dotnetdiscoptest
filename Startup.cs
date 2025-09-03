@@ -11,6 +11,22 @@ public class Startup
 {
     public void ConfigureServices(IServiceCollection services)
     {
+        // Register the Jab container
+        services.AddSingleton<JabServiceContainer>();
+        
+        // Register the mixed service provider
+        services.AddSingleton<MixedServiceProvider>(provider =>
+        {
+            var jabContainer = provider.GetRequiredService<JabServiceContainer>();
+            return new MixedServiceProvider(jabContainer, provider);
+        });
+        
+        // Replace the default service provider and scope factory with our mixed one
+        services.AddSingleton<IServiceProvider>(provider =>
+            provider.GetRequiredService<MixedServiceProvider>());
+        services.AddSingleton<IServiceScopeFactory>(provider =>
+            provider.GetRequiredService<MixedServiceProvider>());
+        
         // Register MS.DI services (IMusic/Jazz)
         services.AddTransient<IMusic, Jazz>();
         
