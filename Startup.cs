@@ -11,8 +11,19 @@ public class Startup
 {
     public void ConfigureServices(IServiceCollection services)
     {
-        // Register the Jab container
-        services.AddSingleton<JabServiceContainer>();
+        // Register MS.DI services first (IMusic/Jazz)
+        services.AddTransient<IMusic, Jazz>();
+        
+        // Register third-party services (only in MS.DI)
+        services.AddTransient<IFoo, ThirdPartyFoo>();
+        services.AddTransient<IBar, ThirdPartyBar>();
+        // ... all other third-party dependencies
+        
+        // Register the Jab container with MS.DI service provider
+        services.AddSingleton<JabServiceContainer>(provider =>
+        {
+            return new JabServiceContainer(provider);
+        });
         
         // Register the mixed service provider
         services.AddSingleton<MixedServiceProvider>(provider =>
@@ -26,9 +37,6 @@ public class Startup
             provider.GetRequiredService<MixedServiceProvider>());
         services.AddSingleton<IServiceScopeFactory>(provider =>
             provider.GetRequiredService<MixedServiceProvider>());
-        
-        // Register MS.DI services (IMusic/Jazz)
-        services.AddTransient<IMusic, Jazz>();
         
         // Add controllers
         services.AddControllers();

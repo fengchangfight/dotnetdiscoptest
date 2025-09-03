@@ -206,7 +206,8 @@ public class ScopedMixedServiceProvider : IServiceProvider
         }
         catch
         {
-            // Jab couldn't create the service
+            // Jab couldn't create the service, try MS.DI fallback
+            return _msDiProvider.GetService(serviceType);
         }
         return null;
     }
@@ -243,5 +244,43 @@ public class ScopedMixedServiceProvider : IServiceProvider
             // If reflection fails, fall back to MS.DI
             return false;
         }
+    }
+}
+
+// Custom service provider that Jab can use to resolve dependencies from MS.DI
+public class MixedDependencyResolver : IServiceProvider
+{
+    private readonly JabServiceContainer _jabContainer;
+    private readonly IServiceProvider _msDiProvider;
+
+    public MixedDependencyResolver(JabServiceContainer jabContainer, IServiceProvider msDiProvider)
+    {
+        _jabContainer = jabContainer;
+        _msDiProvider = msDiProvider;
+    }
+
+    public object? GetService(Type serviceType)
+    {
+        // Try Jab first
+        try
+        {
+            var getServiceMethod = typeof(JabServiceContainer).GetMethod("GetService", new[] { typeof(string) });
+            if (getServiceMethod != null)
+            {
+                var genericMethod = getServiceMethod.MakeGenericMethod(serviceType);
+                var jabService = genericMethod.Invoke(_jabContainer, new object[] { "" });
+                if (jabService != null)
+                {
+                    return jabService;
+                }
+            }
+        }
+        catch
+        {
+            // Jab couldn't resolve, fallback to MS.DI
+        }
+
+        // Fallback to MS.DI
+        return _msDiProvider.GetService(serviceType);
     }
 }
