@@ -50,11 +50,12 @@ public class MixedServiceProvider : IServiceProvider, IServiceScopeFactory
     }
 }
 
-public class MixedServiceScope : IServiceScope
+public class MixedServiceScope : IServiceScope, IDisposable
 {
     private readonly JabServiceContainer _jabContainer;
     private readonly IServiceScope _msDiScope;
     private readonly Dictionary<Type, object> _jabScopedInstances = new();
+    private bool _disposed = false;
 
     public MixedServiceScope(JabServiceContainer jabContainer, IServiceScope msDiScope)
     {
@@ -67,18 +68,53 @@ public class MixedServiceScope : IServiceScope
 
     public void Dispose()
     {
-        // Dispose Jab scoped instances
-        foreach (var instance in _jabScopedInstances.Values)
-        {
-            if (instance is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
-        }
-        _jabScopedInstances.Clear();
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
 
-        // Dispose MS.DI scope
-        _msDiScope?.Dispose();
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                // Dispose managed resources
+                try
+                {
+                    // Dispose Jab scoped instances
+                    foreach (var instance in _jabScopedInstances.Values)
+                    {
+                        if (instance is IDisposable disposable)
+                        {
+                            disposable.Dispose();
+                        }
+                    }
+                    _jabScopedInstances.Clear();
+                }
+                catch
+                {
+                    // Log the exception but don't rethrow to ensure MS.DI scope is also disposed
+                }
+
+                // Dispose MS.DI scope
+                try
+                {
+                    _msDiScope?.Dispose();
+                }
+                catch
+                {
+                    // Log the exception but don't rethrow
+                }
+            }
+
+            _disposed = true;
+        }
+    }
+
+    // Finalizer (destructor) - safety net for unmanaged resources
+    ~MixedServiceScope()
+    {
+        Dispose(false);
     }
 }
 
